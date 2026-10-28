@@ -53,6 +53,28 @@ claude plugin validate .                         # 校验 marketplace
 claude plugin validate ./plugins/task-contract   # 校验插件
 ```
 
+## 发布新版本
+
+从 GitHub 安装的用户只有在插件的 `version` 变化时才会拿到新版本。改了插件却不改版本号，推送上去用户也收不到。
+
+1. 修改插件
+2. 改 `plugins/task-contract/.claude-plugin/plugin.json` 里的 `version`：修正问题改第三位（`0.1.0` → `0.1.1`），新增或改变行为改第二位（`0.1.1` → `0.2.0`）
+3. 校验：`claude plugin validate .`
+4. 提交并推送到 `main`
+
+用户端获取新版本，任选一种：
+
+- 会话里运行 `/plugin marketplace update code-agents`
+- shell 里运行 `claude plugin update task-contract@code-agents`
+- 在 `/plugin` 的 Marketplaces 里选中 `code-agents`，打开 Enable auto-update（默认关闭），之后会在后台自动更新
+
+更新后开新会话或运行 `/reload-plugins` 生效。
+
+注意：
+
+- 版本号只写在 `plugin.json` 里，不要在 `marketplace.json` 的条目里再写一份。两处都写时以 `plugin.json` 为准，`claude plugin validate` 会报不一致
+- 从本地路径安装的插件不受版本号控制，每次会话启动都直接读仓库里的文件
+
 ## 许可证
 
 [MIT](LICENSE) © 2026 chaojun.xiao
