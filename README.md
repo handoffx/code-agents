@@ -48,3 +48,7 @@ claude plugin install task-contract@code-agents
 claude plugin validate .                         # 校验 marketplace
 claude plugin validate ./plugins/task-contract   # 校验插件
 ```
+
+## 许可证
+
+[MIT](LICENSE) © 2026 chaojun.xiao
