@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+"""管理 task-contract 的任务文件。
+
+任务文件放在每个 worktree 根目录的 .agent-tasks/ 下，目录里有一个只写了 `*`
+的 .gitignore，让整个目录不被提交，也不用改项目自己的 .gitignore 或 .git/。
+
+用法：
+  agent-tasks new <slug> --title <标题> --level <L2|L3>   新建任务文件，打印路径
+  agent-tasks list [--all]                               列出本仓库所有 worktree 的未完成任务（--all 含已结束）
+  agent-tasks context                                    给 SessionStart hook 用：有未完成任务时输出提示
+"""
+import argparse
+import datetime
+import json
+import os
+import re
+import subprocess
+import sys
+
+TASK_DIR = ".agent-tasks"
+STATUS_LABELS = {
+    "active": "进行中",
+    "waiting-decision": "等待表态",
+    "waiting-review": "等待审查",
+    "blocked": "卡住",
+    "done": "已完成",
+    "abandoned": "已放弃",
+}
+FINISHED = {"done", "abandoned"}
+
+TEMPLATE = """---
+title: {title}
+level: {level}
+status: waiting-decision
+created: {now}
+updated: {now}
+---
+
+# {title}
+
+目标：<写成可观察的结果>
+预算：<如有>
+
+## 复位卡
+<!-- 每次停下来时重写 -->
+进度：决策清单待表态
+为什么停：等表态
+需要你做：…
+相关决策：…
+
+## 决策
+<!-- 只追加。清单一列出就整份写入，每项标"表态：待表态"；表态后在该项下追加一行。改主意就新加一条，写明"取代 Dn" -->
+
+## 已排除的方案
+<!-- 只追加 -->
+
+## 拆解与进度
+<!-- 状态可以更新；已验证的步骤不能悄悄改回未完成，确需重做时写明原因 -->
+
+## 已知缺口
+"""
+
+
+def git(args, cwd):
+    try:
+        out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+        return out.stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def worktree_root(cwd):
+    out = git(["rev-parse", "--show-toplevel"], cwd)
+    return out.strip() if out else None
+
+
+def all_worktrees(cwd):
+    out = git(["worktree", "list", "--porcelain"], cwd)
+    if not out:
+        root = worktree_root(cwd)
+        return [root] if root else [cwd]
+    return [line[len("worktree "):] for line in out.splitlines() if line.startswith("worktree ")]
+
+
+def parse_frontmatter(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        return None
+    meta = {}
+    for line in m.group(1).splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            meta[k.strip()] = v.strip()
+    step = re.search(r"^进度：(.*)$", text, re.M)
+    meta["progress"] = step.group(1).strip() if step else ""
+    return meta
+
+
+def collect(cwd, include_finished=False):
+    here = worktree_root(cwd)
+    tasks = []
+    for wt in all_worktrees(cwd):
+        d = os.path.join(wt, TASK_DIR)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(d, name)
+            meta = parse_frontmatter(path)
+            if meta is None:
+                continue
+            if meta.get("status") in FINISHED and not include_finished:
+                continue
+            meta.update(path=path, worktree=wt, here=(wt == here))
+            tasks.append(meta)
+    tasks.sort(key=lambda t: t.get("updated", ""), reverse=True)
+    return tasks
+
+
+def describe(t):
+    status = STATUS_LABELS.get(t.get("status", ""), t.get("status", "?"))
+    where = "当前 worktree" if t["here"] else f"worktree: {t['worktree']}"
+    progress = f"，{t['progress']}" if t.get("progress") else ""
+    return (f"- {t.get('title', '?')}（{t.get('level', '?')}，{status}{progress}；"
+            f"更新于 {t.get('updated', '?')}；{where}）\n  {t['path']}")
+
+
+def cmd_new(a):
+    root = worktree_root(os.getcwd())
+    if root is None:
+        sys.exit("当前目录不在 git 仓库里，请向用户确认任务文件放在哪里")
+    slug = re.sub(r"[^a-z0-9-]+", "-", a.slug.lower()).strip("-") or "task"
+    d = os.path.join(root, TASK_DIR)
+    os.makedirs(d, exist_ok=True)
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8") as f:
+            f.write("*\n")
+    today = datetime.date.today().isoformat()
+    path = os.path.join(d, f"{today}-{slug}.md")
+    n = 2
+    while os.path.exists(path):
+        path = os.path.join(d, f"{today}-{slug}-{n}.md")
+        n += 1
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(TEMPLATE.format(title=a.title, level=a.level, now=now))
+    print(path)
+
+
+def cmd_list(a):
+    tasks = collect(os.getcwd(), include_finished=a.all)
+    if not tasks:
+        print("没有未完成的任务" if not a.all else "没有任务")
+        return
+    for t in tasks:
+        print(describe(t))
+
+
+def cmd_context(_):
+    cwd = os.getcwd()
+    try:
+        data = json.load(sys.stdin)
+        cwd = data.get("cwd") or cwd
+    except (json.JSONDecodeError, ValueError):
+        pass
+    tasks = collect(cwd)
+    if not tasks:
+        return
+    lines = ["[task-contract] 这个仓库有未完成的任务（任务文件保存了已定的决策、已排除的方案和进度）："]
+    lines += [describe(t) for t in tasks]
+    lines.append("用户要继续之前的工作时，使用 task-contract:resume；要开始新的多步骤任务时，"
+                 "task-contract:start 会先检查当前 worktree 是否已有进行中的任务。")
+    print("\n".join(lines))
+
+
+def main():
+    p = argparse.ArgumentParser(prog="agent-tasks")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    n = sub.add_parser("new")
+    n.add_argument("slug")
+    n.add_argument("--title", required=True)
+    n.add_argument("--level", default="L2", choices=["L2", "L3"])
+    n.set_defaults(func=cmd_new)
+    ls = sub.add_parser("list")
+    ls.add_argument("--all", action="store_true")
+    ls.set_defaults(func=cmd_list)
+    c = sub.add_parser("context")
+    c.set_defaults(func=cmd_context)
+    a = p.parse_args()
+    a.func(a)
+
+
+if __name__ == "__main__":
+    main()

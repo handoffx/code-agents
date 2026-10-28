@@ -1,0 +1,14 @@
+{
+  "name": "code-agents",
+  "description": "code agent 使用方法论落成的 Claude Code 插件",
+  "owner": {
+    "name": "chaojun.xiao"
+  },
+  "plugins": [
+    {
+      "name": "task-contract",
+      "source": "./plugins/task-contract",
+      "description": "先定决策、再拆解、小步验收、可核对证据的多步骤开发任务流程"
+    }
+  ]
+}
