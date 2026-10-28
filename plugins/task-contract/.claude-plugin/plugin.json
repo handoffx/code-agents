@@ -5,5 +5,11 @@
   "author": {
     "name": "chaojun.xiao"
   },
-  "keywords": ["workflow", "task", "decision", "review"]
+  "keywords": [
+    "workflow",
+    "task",
+    "decision",
+    "review"
+  ],
+  "license": "MIT"
 }
