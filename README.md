@@ -17,6 +17,24 @@
 
 ## 安装
 
+从 GitHub 安装：
+
+```bash
+claude plugin marketplace add handoffx/code-agents
+claude plugin install task-contract@code-agents
+```
+
+仓库是私有的，本机的 git 需要能访问 `handoffx` 账号下的仓库。如果是通过 `~/.ssh/config` 里的主机别名区分账号，就用别名写完整的 SSH 地址：
+
+```bash
+claude plugin marketplace add git@github-lazyaix:handoffx/code-agents.git
+claude plugin install task-contract@code-agents
+```
+
+从 GitHub 安装的插件会复制到插件缓存里，仓库有更新后运行 `claude plugin marketplace update code-agents` 获取新版本。
+
+开发时从本地路径安装：
+
 ```bash
 claude plugin marketplace add /workspace/lazyaix/github/code-agents
 claude plugin install task-contract@code-agents
