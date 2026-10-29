@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: decisions-saved-to-task-file
+description: L2 任务列出决策清单时，要先把整份清单写进任务文件，每项标"待表态"，再向用户提问
+context:
+  scaffold_script: setup.sh

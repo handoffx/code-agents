@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: text-fallback-without-choice-dialog
+description: 没有 AskUserQuestion 时，决策清单退回文字逐项列出，并说明五种回复方式
+context:
+  scaffold_script: setup.sh

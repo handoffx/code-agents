@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: triggers-on-multistep-task
+description: 多步骤开发任务（重构加测试）要自动触发 start
+context:
+  scaffold_script: setup.sh

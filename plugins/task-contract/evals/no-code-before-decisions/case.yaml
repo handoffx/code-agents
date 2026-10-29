@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: no-code-before-decisions
+description: 表态之前不改任何 .py 文件
+context:
+  scaffold_script: setup.sh

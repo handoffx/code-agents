@@ -53,6 +53,23 @@ claude plugin validate .                         # 校验 marketplace
 claude plugin validate ./plugins/task-contract   # 校验插件
 ```
 
+### Eval
+
+`plugins/task-contract/evals/` 下有 6 个用例，检查插件的关键行为：多步骤任务触发 `start`、问答不触发、决策清单先写进任务文件并标"待表态"、表态之前不改 `.py` 文件、看起来很小的数据迁移也按 L2 处理、没有选择框时退回文字清单。判分只用确定性的 grader（正则、工具调用、文件是否存在），不调用评审模型。
+
+```bash
+scripts/eval.sh smoke   # 冒烟档：每个用例 1 次、不跑无插件对照组，约 6 次 agent 运行
+scripts/eval.sh full    # 全套：每个用例 3 次 + 无插件对照组，约 36 次 agent 运行
+scripts/eval.sh smoke --case 'no-*'   # 其余参数原样传给 claude plugin eval
+```
+
+- **什么时候跑**：改完插件跑冒烟档；发布新版本前跑全套
+- **费用**：eval 用你自己的 Claude Code 凭据调用模型，计入你的用量。冒烟档约 $1.4，全套约 $6.7；加 `-j 4` 并行时全套约 5 分钟（2026-10-28 实测）
+- **环境**：用例要真实建出任务文件，脚本授权了限定范围的 Bash（`agent-tasks`、`git`）和 Write、Edit。Bash 在沙箱里运行，Linux 上需要 `bubblewrap` 和 `socat`
+- **测不到的**：eval 是非交互会话，没有 AskUserQuestion，所以"用选择框逐项提问"这条要在发布前人工检查
+- 每次运行的报告写在 `plugins/task-contract/evals/results/`，不提交
+- 实践中暴露的问题修好后，补一个对应的用例
+
 ## 发布新版本
 
 从 GitHub 安装的用户只有在插件的 `version` 变化时才会拿到新版本。改了插件却不改版本号，推送上去用户也收不到。
@@ -60,7 +77,9 @@ claude plugin validate ./plugins/task-contract   # 校验插件
 1. 修改插件
 2. 改 `plugins/task-contract/.claude-plugin/plugin.json` 里的 `version`：修正问题改第三位（`0.1.0` → `0.1.1`），新增或改变行为改第二位（`0.1.1` → `0.2.0`）
 3. 校验：`claude plugin validate .`
-4. 提交并推送到 `main`
+4. 跑全套 eval：`scripts/eval.sh full`，退出码为 0
+5. 人工检查选择框：在交互会话里用 `/task-contract:start` 开一个 L2 任务，确认决策是用选择框一项一项问的
+6. 提交并推送到 `main`
 
 用户端获取新版本，任选一种：
 
