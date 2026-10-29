@@ -12,6 +12,8 @@
 4. **成本和不确定性成正比。** 按"有没有未定的决策"分级，简单任务直接做，复杂任务才走决策清单和完整拆解；数据迁移、改接口、鉴权、依赖升级这类改动出了错发现慢、回退难，至少走决策清单
 5. **审查的是契约，不是 diff。** 机器负责证明，agent 的报告只当索引，人只判断契约层面的变化：新接口、新抽象、新依赖、模块边界。审查深度与发现和回退能力成反比
 
+完整的方法论笔记见 [docs/](docs/README.md)，由作者的 Obsidian 笔记单向导出，建议从"方法论总览"读起。
+
 ## task-contract
 
 把多步骤开发任务按"先定决策、再拆解、小步验收、可核对证据"的流程交给 agent：分级 → 探索 → 决策清单 → 拆解（首尾整体验收）→ 小步执行 → 完成报告。L2 及以上的任务用任务文件保存决策、已排除的方案和进度，丢掉会话或上下文被压缩后都能接着做；多个任务可以在不同的 worktree 里并存。
@@ -71,6 +73,19 @@ scripts/eval.sh smoke --case 'no-*'   # 其余参数原样传给 claude plugin e
 - **测不到的**：eval 是非交互会话，没有 AskUserQuestion，所以"用选择框逐项提问"这条要在发布前人工检查；eval 只放行 `EVAL_*` 环境变量，后台会话的 `CLAUDE_JOB_DIR` 自动检测也测不到，要用 `claude --bg` 实际跑一次
 - 每次运行的报告写在 `plugins/task-contract/evals/results/`，不提交
 - 实践中暴露的问题修好后，补一个对应的用例
+
+### 方法论文档
+
+`docs/` 由 `scripts/export-docs.py` 从 Obsidian 笔记单向导出，不要直接修改：只导出状态为"共识"的方法论笔记（路线图除外），笔记之间的双链转成相对链接，指向未公开笔记的双链只保留文字。
+
+```bash
+export OBSIDIAN_VAULT=<Obsidian vault 路径>   # 也可以每次用 --vault 指定
+scripts/export-docs.py            # 改完笔记后重新导出，再提交 docs/
+scripts/export-docs.py --check    # 只比较不写入；docs/ 与笔记不一致时退出码为 1
+python3 scripts/test_export_docs.py   # 导出脚本的测试；设了 OBSIDIAN_VAULT 时还会检查真实笔记
+```
+
+提交前跑一次 `--check`：它能发现"改了笔记忘了导出"和"有人直接改了 docs/"两种情况。
 
 ## 发布新版本
 
