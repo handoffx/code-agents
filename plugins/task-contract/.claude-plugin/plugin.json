@@ -1,6 +1,6 @@
 {
   "name": "task-contract",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "先定决策、再拆解、小步验收、可核对证据：把多步骤开发任务按契约交给 agent，任务文件保存决策和进度，支持多个任务并存与恢复",
   "author": {
     "name": "chaojun.xiao"

@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: continuous-mode-runs-to-end
+description: 用户事先说明决策交给 agent、决策后一口气做完时，执行阶段不逐步停下，一次运行里做完、跑测试并给出完成报告
+context:
+  scaffold_script: setup.sh

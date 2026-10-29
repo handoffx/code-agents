@@ -11,11 +11,13 @@ case "$mode" in
   full)  tier=() ;;
   *) echo "用法：$0 smoke|full [claude plugin eval 的其他参数]" >&2; exit 64 ;;
 esac
-# 用例要真实建出任务文件，所以授权限定范围的 Bash 和文件写入；Bash 在沙箱里运行
+# 当前会话的 PATH 里有已安装版本的 agent-tasks，eval 会继承它；把仓库里的放在最前面，测的才是正在改的版本
+export PATH="$PWD/plugins/task-contract/bin:$PATH"
+# 用例要真实建出任务文件、跑测试，所以授权限定范围的 Bash 和文件写入；Bash 在沙箱里运行
 exec claude plugin eval ./plugins/task-contract \
   "${tier[@]}" \
   --scaffold \
   --trust-plugin \
   --no-publish \
-  --allow-tools "Bash(agent-tasks *)" "Bash(git *)" Write Edit \
+  --allow-tools "Bash(agent-tasks *)" "Bash(git *)" "Bash(python3 *)" Write Edit \
   "$@"

@@ -23,6 +23,8 @@
 | `agent-tasks` | 插件自带命令：`new` 新建任务文件，`list [--all]` 列出任务 |
 | SessionStart hook | 会话开始、恢复、`/clear`、上下文压缩后，有未完成任务时提示 Claude |
 
+执行阶段有两种方式：**逐步**（默认，每完成一步停下来交证据）和**一口气**（决策和拆解定下来后一直做完，证据写进任务文件，只在冒出新决策、卡住、做到一大半补不完时停）。后台会话（`claude --bg`）里检测到 `CLAUDE_JOB_DIR` 时默认一口气；前台确认拆解时可以选。两种方式都要先写整体验收检查，最后给出固定 6 段标题的完成报告。
+
 任务文件在每个 worktree 根目录的 `.agent-tasks/` 下。目录里有一个只写了 `*` 的 `.gitignore`，所以不会被提交，也不用改项目自己的 `.gitignore`。同一个 worktree 同一时间只建议有一个任务在改代码，要并行就用 `claude --worktree <名字>` 另开 worktree。
 
 ## 安装
@@ -55,18 +57,18 @@ claude plugin validate ./plugins/task-contract   # 校验插件
 
 ### Eval
 
-`plugins/task-contract/evals/` 下有 6 个用例，检查插件的关键行为：多步骤任务触发 `start`、问答不触发、决策清单先写进任务文件并标"待表态"、表态之前不改 `.py` 文件、看起来很小的数据迁移也按 L2 处理、没有选择框时退回文字清单。判分只用确定性的 grader（正则、工具调用、文件是否存在），不调用评审模型。
+`plugins/task-contract/evals/` 下有 7 个用例，检查插件的关键行为：多步骤任务触发 `start`、问答不触发、决策清单先写进任务文件并标"待表态"、表态之前不改 `.py` 文件、看起来很小的数据迁移也按 L2 处理、没有选择框时退回文字清单、用户事先授权时一口气做完并给出 6 段完成报告。判分只用确定性的 grader（正则、工具调用、文件是否存在），不调用评审模型。
 
 ```bash
-scripts/eval.sh smoke   # 冒烟档：每个用例 1 次、不跑无插件对照组，约 6 次 agent 运行
-scripts/eval.sh full    # 全套：每个用例 3 次 + 无插件对照组，约 36 次 agent 运行
+scripts/eval.sh smoke   # 冒烟档：每个用例 1 次、不跑无插件对照组，约 7 次 agent 运行
+scripts/eval.sh full    # 全套：每个用例 3 次 + 无插件对照组，约 42 次 agent 运行
 scripts/eval.sh smoke --case 'no-*'   # 其余参数原样传给 claude plugin eval
 ```
 
 - **什么时候跑**：改完插件跑冒烟档；发布新版本前跑全套
-- **费用**：eval 用你自己的 Claude Code 凭据调用模型，计入你的用量。冒烟档约 $1.4，全套约 $6.7；加 `-j 4` 并行时全套约 5 分钟（2026-10-28 实测）
-- **环境**：用例要真实建出任务文件，脚本授权了限定范围的 Bash（`agent-tasks`、`git`）和 Write、Edit。Bash 在沙箱里运行，Linux 上需要 `bubblewrap` 和 `socat`
-- **测不到的**：eval 是非交互会话，没有 AskUserQuestion，所以"用选择框逐项提问"这条要在发布前人工检查
+- **费用**：eval 用你自己的 Claude Code 凭据调用模型，计入你的用量。冒烟档约 $1.9（2026-10-29 实测，7 个用例），全套约 $8.8；加 `-j 4` 并行时全套约 7 分钟
+- **环境**：用例要真实建出任务文件，脚本授权了限定范围的 Bash（`agent-tasks`、`git`、`python3`）和 Write、Edit，并把仓库里的 `plugins/task-contract/bin` 放在 PATH 最前面（否则 eval 会继承当前会话 PATH 里已安装版本的 `agent-tasks`）。Bash 在沙箱里运行，Linux 上需要 `bubblewrap` 和 `socat`
+- **测不到的**：eval 是非交互会话，没有 AskUserQuestion，所以"用选择框逐项提问"这条要在发布前人工检查；eval 只放行 `EVAL_*` 环境变量，后台会话的 `CLAUDE_JOB_DIR` 自动检测也测不到，要用 `claude --bg` 实际跑一次
 - 每次运行的报告写在 `plugins/task-contract/evals/results/`，不提交
 - 实践中暴露的问题修好后，补一个对应的用例
 
